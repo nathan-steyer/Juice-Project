@@ -1,6 +1,7 @@
 from flask import Flask, render_template
 import requests, json, re
 
+# create dictionary for POST request to Nutritionix API
 query = {}
 query['appId'] = 'd704c37f'
 query['appKey'] = '9d94b5b51ccfb1cf5f8dc3ac208cbdbc'
@@ -23,12 +24,13 @@ filters = {}
 filters['brand_id'] = '51db37d0176fe9790a899db2'
 query['filters'] = filters
 
-
+# convert query to JSON, make request for first 50 products
 url = 'https://api.nutritionix.com/v1_1/search'
 headers = { 'Content-Type': 'application/json' }
 response = requests.post(url, headers=headers, data=json.dumps(query)).json()
 hits = response['hits']
 
+# get the rest of the products
 while len(hits) < response['total']:
 	query['offset'] = len(hits)
 	response = requests.post(url, headers=headers, data=json.dumps(query)).json()
@@ -36,6 +38,8 @@ while len(hits) < response['total']:
 
 totalProducts = len(hits)
 
+# list of tuples containing clean names for ingredients and regular
+# expressions for recognizing them in the ingredient statements
 ingredientNames = [
 	('Apple Juice', re.compile('apple(?<!pine)', re.IGNORECASE)),
 	('Pear Juice', re.compile('pear', re.IGNORECASE)),
@@ -72,6 +76,8 @@ ingredientNames = [
 	('Malic Acid', re.compile('malic', re.IGNORECASE))
 ]
 
+# list of tuples containing clean names for flavors and regular
+# expressions for recognizing them in the names of items
 flavorNames = [
 	('Apple Raspberry', re.compile('apple raspberry', re.IGNORECASE)),
 	('Apple Banana', re.compile('apple banana', re.IGNORECASE)),
@@ -113,10 +119,13 @@ calories = 0
 ounces = 0
 ingredientsMap = {}
 
+# iterate over each product
 for hit in hits:
 	info = hit['fields']
 	ingredients = info['nf_ingredient_statement']
 	
+	# include the product in the calculation of 'average
+	# calories per ounce' if it has the correct units
 	if info['nf_serving_size_unit'] == 'fl oz':
 		calories += info['nf_calories']
 		ounces += info['nf_serving_size_qty']
@@ -124,12 +133,16 @@ for hit in hits:
 	if ingredients is not None:
 		cleanIngredients = []
 		
+		# search the ingredient statement with each regular expression
+		# and note the corresponding clean name when there is a match
 		for pair in ingredientNames:
 			name = pair[0]
 			regExpr = pair[1]
 			if regExpr.search(ingredients) is not None:
 				cleanIngredients.append(name)
 		
+		# search the item's name with each regular expression until
+		# a match is found, note the clean name, then short-circuit
 		for pair in flavorNames:
 			name = pair[0]
 			regExpr = pair[1]
@@ -137,6 +150,7 @@ for hit in hits:
 				cleanName = name
 				break
 		
+		# build the dictionary of ingredient names and sets of flavors
 		for cleanIngredient in cleanIngredients:
 			if cleanIngredient in ingredientsMap:
 				ingredientsMap[cleanIngredient].add(cleanName)
@@ -148,17 +162,20 @@ caloriesPerOunce = calories / ounces
 
 app = Flask(__name__)
 
+# render the template based on the variable passed
 @app.route('/')
 @app.route('/<ingredient>')
 def send_page(ingredient=None):
 	return render_template('base.html', map=ingredientsMap, clicked=ingredient)
 
+# return the total number of products in JSON format
 @app.route('/total')
 def send_total():
 	response = {}
 	response['total_products'] = totalProducts
 	return json.dumps(response)
 
+# return the average calories per ounce in JSON format
 @app.route('/average')
 def send_average():
 	response = {}
