@@ -1,5 +1,5 @@
-from flask import Flask, render_template
-import requests, json, re
+from flask import Flask, render_template, jsonify
+import requests, re
 
 # create dictionary for POST request to Nutritionix API
 query = {}
@@ -27,13 +27,13 @@ query['filters'] = filters
 # convert query to JSON, make request for first 50 products
 url = 'https://api.nutritionix.com/v1_1/search'
 headers = { 'Content-Type': 'application/json' }
-response = requests.post(url, headers=headers, data=json.dumps(query)).json()
+response = requests.post(url, headers=headers, json=query).json()
 hits = response['hits']
 
 # get the rest of the products
 while len(hits) < response['total']:
 	query['offset'] = len(hits)
-	response = requests.post(url, headers=headers, data=json.dumps(query)).json()
+	response = requests.post(url, headers=headers, json=query).json()
 	hits += response['hits']
 
 totalProducts = len(hits)
@@ -162,22 +162,18 @@ caloriesPerOunce = calories / ounces
 
 app = Flask(__name__)
 
+# return the total number of products in JSON format
+@app.route('/total')
+def send_total():
+	return jsonify(total_products=totalProducts)
+
+# return the average calories per ounce in JSON format
+@app.route('/average')
+def send_average():
+	return jsonify(average_calories_per_fl_oz=caloriesPerOunce)
+
 # render the template based on the variable passed
 @app.route('/')
 @app.route('/<ingredient>')
 def send_page(ingredient=None):
 	return render_template('base.html', map=ingredientsMap, clicked=ingredient)
-
-# return the total number of products in JSON format
-@app.route('/total')
-def send_total():
-	response = {}
-	response['total_products'] = totalProducts
-	return json.dumps(response)
-
-# return the average calories per ounce in JSON format
-@app.route('/average')
-def send_average():
-	response = {}
-	response['average_calories_per_fl_oz'] = caloriesPerOunce
-	return json.dumps(response)
