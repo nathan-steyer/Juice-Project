@@ -1,0 +1,9 @@
+Python version:
+  3.6.1
+
+Non-standard modules:
+  Flask
+  requests
+
+Browsers not supported:
+  Internet Explorer
