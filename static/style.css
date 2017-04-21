@@ -1,3 +1,7 @@
+.container-fluid {
+	min-width: 668px;
+}
+
 #ingredients {
 	float: left;
 }
